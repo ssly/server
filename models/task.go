@@ -23,13 +23,8 @@ type Task struct {
 	Memo      string        `json:"memo"`
 }
 
-type TaskOption struct {
-	Finish bool
-	Type   int8
-}
-
 // DeleteTask that delete the task by id from db.
-func DeleteTask(id string, cb func(success bool)) {
+func DeleteTask(idList []string, cb func(success bool)) {
 	session, err := mgo.Dial(MONGO_URI)
 	if err != nil {
 		panic(err)
@@ -38,18 +33,39 @@ func DeleteTask(id string, cb func(success bool)) {
 	session.SetMode(mgo.Monotonic, true)
 	c := session.DB("ly").C("task")
 
-	err = c.Remove(bson.M{"_id": bson.ObjectIdHex(id)})
-	if err != nil {
-		log.Fatal(err)
-		cb(false)
-		return
+	errCount := 0
+	idListLen := len(idList)
+	channel := make(chan bool, idListLen)
+	for _, id := range idList {
+
+		go func(id string) {
+			defer func() {
+				if err := recover(); err != nil {
+					errCount++
+					channel <- true
+				}
+			}()
+
+			err := c.Remove(bson.M{"_id": bson.ObjectIdHex(id)})
+			if err != nil {
+				panic(err)
+			}
+			channel <- true
+		}(id)
+	}
+	for i := 0; i < idListLen; i++ {
+		<-channel
 	}
 
-	cb(true)
+	if errCount > 0 {
+		cb(false)
+	} else {
+		cb(true)
+	}
 }
 
 // GetOneTask that get one task by id for db.
-func GetOneTask(id string, cb func(task Task)) {
+func GetOneTask(id string, cb func(task []Task)) {
 	session, err := mgo.Dial(MONGO_URI)
 	if err != nil {
 		panic(err)
@@ -59,12 +75,18 @@ func GetOneTask(id string, cb func(task Task)) {
 	c := session.DB("ly").C("task")
 
 	var task Task
+	defer func() {
+		if err := recover(); err != nil {
+			cb(nil)
+		}
+	}()
+
 	err = c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	cb(task)
+	cb([]Task{task})
 }
 
 // GetTask that get all task list from db.

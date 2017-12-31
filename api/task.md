@@ -80,7 +80,7 @@ POST /task/manager
 | 参数 | 类型 | 可选值 | 说明 |
 | :- | :- | :- | :- |
 | name | string | - | 必填 |
-| type | number | 1/2/3/4 | 选填，默认为1，类型，紧急重要/紧急不重要/不急重要/不急不重要 |
+| type | number | 1/2/3/4 | 选填，默认为1，类型，紧急重要/紧急不重要/不急重要/不急不重要 |
 | difficult | number | 1/2/3 | 选填，默认为2，难度，困难/中等/容易 |
 | deadline | number | 0,1,... | 选填，默认为当天，截止至 |
 | finish | boolean | true/false | 选填，默认为false，是否完成 |
@@ -136,6 +136,21 @@ PUT /task/manager
 }
 ```
 
+### 删除多个任务
+#### URL
+DELETE /task/manager
+#### 请求格式
+```json
+["599af5182e02e989cfe19048", "5a37da1bf860a92924b3b3a9"]
+```
+### 返回格式
+```json
+{
+    "success": true,
+    "code": 0,
+    "data": null
+}
+```
 
 ### 删除单个任务
 #### URL

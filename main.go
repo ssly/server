@@ -14,6 +14,7 @@ func main() {
 
 	route.POST("/task/manager", controllers.CreateTask)
 	route.DELETE("/task/manager/:id", controllers.DeleteTask)
+	route.DELETE("/task/manager", controllers.DeleteTask)
 	route.PUT("/task/manager", controllers.UpdateTask)
 	route.GET("/task/manager/:id", controllers.GetTask) // find one task
 	route.GET("/task/manager", controllers.GetTask)     // find all task list

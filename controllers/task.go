@@ -20,9 +20,14 @@ func CreateTask(c *gin.Context) {
 
 // DeleteTask for delete task
 func DeleteTask(c *gin.Context) {
+	var idList = make([]string, 1)
 	id := c.Param("id")
-
-	models.DeleteTask(id, func(success bool) {
+	if id != "" {
+		idList[0] = id
+	} else {
+		c.ShouldBindJSON(&idList)
+	}
+	models.DeleteTask(idList, func(success bool) {
 		if success {
 			c.JSON(200, Result{
 				Success: true,
@@ -49,16 +54,24 @@ func GetTask(c *gin.Context) {
 	id := c.Param("id")
 	// find one
 	if id != "" {
-		models.GetOneTask(id, func(task models.Task) {
-			c.JSON(200, struct {
-				Success bool        `json:"success"`
-				Code    int8        `json:"code"`
-				Data    models.Task `json:"data"`
-			}{
-				Success: true,
-				Code:    0,
-				Data:    task,
-			})
+		models.GetOneTask(id, func(task []models.Task) {
+			if task != nil {
+				c.JSON(200, struct {
+					Success bool        `json:"success"`
+					Code    int8        `json:"code"`
+					Data    models.Task `json:"data"`
+				}{
+					Success: true,
+					Code:    0,
+					Data:    task[0],
+				})
+			} else {
+				c.JSON(200, Result{
+					Success: true,
+					Code:    0,
+					Data:    nil,
+				})
+			}
 		})
 	} else {
 		option := make(map[string]interface{})
@@ -85,9 +98,11 @@ func GetTask(c *gin.Context) {
 			option["hours"] = map[string]int{"$gte": int(minHour), "$lte": int(maxHour)}
 		} else if minHoursString != "" && maxHoursString == "" {
 			minHour, _ := strconv.ParseInt(minHoursString, 10, 32)
+
 			option["hours"] = map[string]int{"$gte": int(minHour)}
 		} else if minHoursString == "" && maxHoursString != "" {
 			maxHour, _ := strconv.ParseInt(maxHoursString, 10, 32)
+
 			option["hours"] = map[string]int{"$lte": int(maxHour)}
 		}
 
