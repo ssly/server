@@ -13,14 +13,82 @@ const (
 )
 
 type Task struct {
-	ID        bson.ObjectId `json:"id" bson:"_id"`
-	Name      string        `json:"name"`
-	Type      int8          `json:"type"`
-	Difficult int8          `json:"difficult"`
-	Deadline  string        `json:"deadline"`
-	Hours     int           `json:"hours"`
-	Finish    bool          `json:"finish"`
-	Memo      string        `json:"memo"`
+	ID         bson.ObjectId `json:"id" bson:"_id"`
+	Name       string        `json:"name"`
+	Type       int8          `json:"type"`
+	Difficult  int8          `json:"difficult"`
+	Deadline   string        `json:"deadline"`
+	Hours      int           `json:"hours"`
+	Finish     bool          `json:"finish"`
+	Memo       string        `json:"memo"`
+	CreateTime int64         `json:"createTime"`
+	UpdateTime int64         `json:"updateTime"`
+}
+
+// GetTask that get all task list from db.
+func GetTask(option map[string]interface{}, cb func(task []Task)) {
+
+	fmt.Println("查询条件:", option)
+	session, err := mgo.Dial(MONGO_URI)
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("ly").C("task")
+
+	var task []Task
+	err = c.Find(option).All(&task)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cb(task)
+}
+
+// GetOneTask that get one task by id for db.
+func GetOneTask(id string, cb func(task []Task)) {
+	session, err := mgo.Dial(MONGO_URI)
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("ly").C("task")
+
+	var task Task
+	defer func() {
+		if err := recover(); err != nil {
+			cb(nil)
+		}
+	}()
+
+	err = c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
+	if err != nil {
+		panic(err)
+	}
+
+	cb([]Task{task})
+}
+
+// CreateTask that create one task
+func CreateTask(task Task, cb func(success bool)) {
+	session, err := mgo.Dial(MONGO_URI)
+	if err != nil {
+		panic(err)
+	}
+	defer session.Close()
+	session.SetMode(mgo.Monotonic, true)
+	c := session.DB("ly").C("task")
+
+	err = c.Insert(task)
+	if err != nil {
+		log.Fatal(err)
+		cb(false)
+		return
+	}
+
+	cb(true)
 }
 
 // DeleteTask that delete the task by id from db.
@@ -62,50 +130,4 @@ func DeleteTask(idList []string, cb func(success bool)) {
 	} else {
 		cb(true)
 	}
-}
-
-// GetOneTask that get one task by id for db.
-func GetOneTask(id string, cb func(task []Task)) {
-	session, err := mgo.Dial(MONGO_URI)
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("ly").C("task")
-
-	var task Task
-	defer func() {
-		if err := recover(); err != nil {
-			cb(nil)
-		}
-	}()
-
-	err = c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
-	if err != nil {
-		panic(err)
-	}
-
-	cb([]Task{task})
-}
-
-// GetTask that get all task list from db.
-func GetTask(option map[string]interface{}, cb func(task []Task)) {
-
-	fmt.Println("查询条件:", option)
-	session, err := mgo.Dial(MONGO_URI)
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("ly").C("task")
-
-	var task []Task
-	err = c.Find(option).All(&task)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cb(task)
 }

@@ -2,20 +2,63 @@ package controllers
 
 import (
 	"strconv"
+	"time"
+
+	"gopkg.in/mgo.v2/bson"
 
 	"../models"
 	"github.com/gin-gonic/gin"
 )
 
 type Result struct {
-	Success bool          `json:"success"`
-	Code    int8          `json:"code"`
-	Data    []models.Task `json:"data"`
+	Success bool        `json:"success"`
+	Code    int8        `json:"code"`
+	Data    interface{} `json:"data"`
 }
 
 // CreateTask for create task
 func CreateTask(c *gin.Context) {
-	c.String(200, "Create task uccess")
+	nowTime := time.Now().Unix() * 1000
+	id := bson.NewObjectId()
+
+	task := models.Task{
+		ID:         id,
+		Name:       "",
+		Type:       1,
+		Difficult:  2,
+		Deadline:   time.Now().Format("2006-01-02 15:04:05"),
+		Hours:      8,
+		Finish:     false,
+		Memo:       "",
+		CreateTime: nowTime,
+		UpdateTime: nowTime,
+	}
+	c.ShouldBindJSON(&task)
+
+	if task.Name == "" {
+		c.JSON(200, Result{
+			Success: false,
+			Code:    1,
+			Data:    nil,
+		})
+		return
+	}
+
+	models.CreateTask(task, func(success bool) {
+		if success {
+			c.JSON(200, Result{
+				Success: true,
+				Code:    0,
+				Data:    id.Hex(),
+			})
+		} else {
+			c.JSON(200, Result{
+				Success: false,
+				Code:    1,
+				Data:    nil,
+			})
+		}
+	})
 }
 
 // DeleteTask for delete task
@@ -36,7 +79,7 @@ func DeleteTask(c *gin.Context) {
 			})
 		} else {
 			c.JSON(200, Result{
-				Success: true,
+				Success: false,
 				Code:    1,
 				Data:    nil,
 			})
@@ -56,11 +99,7 @@ func GetTask(c *gin.Context) {
 	if id != "" {
 		models.GetOneTask(id, func(task []models.Task) {
 			if task != nil {
-				c.JSON(200, struct {
-					Success bool        `json:"success"`
-					Code    int8        `json:"code"`
-					Data    models.Task `json:"data"`
-				}{
+				c.JSON(200, Result{
 					Success: true,
 					Code:    0,
 					Data:    task[0],

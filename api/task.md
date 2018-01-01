@@ -73,7 +73,7 @@ GET /task/manager/:id
 }
 ```
 
-### 增加单个任务（暂未实现）
+### 增加单个任务
 #### URL
 POST /task/manager
 #### 请求参数
