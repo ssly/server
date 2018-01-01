@@ -81,11 +81,15 @@ func CreateTask(task Task, cb func(success bool)) {
 	session.SetMode(mgo.Monotonic, true)
 	c := session.DB("ly").C("task")
 
+	defer func() {
+		if err := recover(); err != nil {
+			cb(false)
+		}
+	}()
+
 	err = c.Insert(task)
 	if err != nil {
-		log.Fatal(err)
-		cb(false)
-		return
+		panic(err)
 	}
 
 	cb(true)
