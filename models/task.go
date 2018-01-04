@@ -2,7 +2,9 @@ package models
 
 import (
 	"fmt"
-	"log"
+	"strconv"
+
+	"github.com/gin-gonic/gin"
 
 	"../config"
 	mgo "gopkg.in/mgo.v2"
@@ -24,54 +26,8 @@ type Task struct {
 	UpdateTime int64         `json:"updateTime"`
 }
 
-// GetTask that get all task list from db.
-func GetTask(option map[string]interface{}, cb func(task []Task)) {
-
-	fmt.Println("查询条件:", option)
-	session, err := mgo.Dial(MongoURL)
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("ly").C("task")
-
-	var task []Task
-	err = c.Find(option).All(&task)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cb(task)
-}
-
-// GetOneTask that get one task by id for db.
-func GetOneTask(id string, cb func(task []Task)) {
-	session, err := mgo.Dial(MongoURL)
-	if err != nil {
-		panic(err)
-	}
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
-	c := session.DB("ly").C("task")
-
-	var task Task
-	defer func() {
-		if err := recover(); err != nil {
-			cb(nil)
-		}
-	}()
-
-	err = c.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
-	if err != nil {
-		panic(err)
-	}
-
-	cb([]Task{task})
-}
-
 // CreateTask that create one task
-func CreateTask(task Task, cb func(success bool)) {
+func CreateTask(task *Task, cb func(success bool)) {
 	defer func() {
 		if err := recover(); err != nil {
 			cb(false)
@@ -98,7 +54,7 @@ func CreateTask(task Task, cb func(success bool)) {
 func UpdateTask(item map[string]interface{}, cb func(success bool)) {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Println("难道能报错")
+			fmt.Println(err)
 			cb(false)
 		}
 	}()
@@ -108,7 +64,6 @@ func UpdateTask(item map[string]interface{}, cb func(success bool)) {
 
 	session, err := mgo.Dial(MongoURL)
 	if err != nil {
-		fmt.Println("数据库报的错误")
 		panic(err)
 	}
 	defer session.Close()
@@ -117,23 +72,33 @@ func UpdateTask(item map[string]interface{}, cb func(success bool)) {
 
 	err = c.Update(bson.M{"_id": bson.ObjectIdHex(id)}, item)
 	if err != nil {
-		fmt.Println("插入数据报的错误")
 		panic(err)
 	}
-	fmt.Println("更新成功了")
 	cb(true)
 }
 
 // DeleteTask that delete the task by id from db.
-func DeleteTask(idList []string, cb func(success bool)) {
+func DeleteTask(idList []string, callback func(code int16)) {
+	var code int16 = 0 // option code
+
+	// 可能出现错误
+	// 1. 传入的id一个都没有删除
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+			callback(code)
+		}
+	}()
 	session, err := mgo.Dial(MongoURL)
 	if err != nil {
-		panic(err)
+		fmt.Println("Database connect error:", err)
 	}
-	defer session.Close()
-	session.SetMode(mgo.Monotonic, true)
+	fmt.Println(session)
+	// defer session.Close()
+	// session.SetMode(mgo.Monotonic, true)
 	c := session.DB("ly").C("task")
-
+	fmt.Println("删除卡主了")
+	fmt.Println("这是一个什么哦", c)
 	errCount := 0
 	idListLen := len(idList)
 	channel := make(chan bool, idListLen)
@@ -149,6 +114,8 @@ func DeleteTask(idList []string, cb func(success bool)) {
 
 			err := c.Remove(bson.M{"_id": bson.ObjectIdHex(id)})
 			if err != nil {
+
+				fmt.Println("Task: Call DeleteTask error, this id is", id)
 				panic(err)
 			}
 			channel <- true
@@ -158,9 +125,40 @@ func DeleteTask(idList []string, cb func(success bool)) {
 		<-channel
 	}
 
-	if errCount > 0 {
-		cb(false)
-	} else {
-		cb(true)
+	callback(code)
+}
+
+// GetOptionForRetrieveTask for get options for retrieve task
+// contain finish / type / difficult / minHours / maxHours
+func GetOptionForRetrieveTask(c *gin.Context, option map[string]interface{}) {
+	finishString := c.Query("finish")
+	typeString := c.Query("type")
+	difficultString := c.Query("difficult")
+	minHoursString := c.Query("minHours")
+	maxHoursString := c.Query("maxHours")
+
+	if finishString != "" {
+		option["finish"], _ = strconv.ParseBool(finishString)
+	}
+	if typeString != "" {
+		option["type"], _ = strconv.ParseInt(typeString, 10, 8)
+	}
+	if difficultString != "" {
+		option["difficult"], _ = strconv.ParseInt(difficultString, 10, 8)
+	}
+
+	if minHoursString != "" && maxHoursString != "" {
+		minHour, _ := strconv.ParseInt(minHoursString, 10, 32)
+		maxHour, _ := strconv.ParseInt(maxHoursString, 10, 32)
+
+		option["hours"] = map[string]int{"$gte": int(minHour), "$lte": int(maxHour)}
+	} else if minHoursString != "" && maxHoursString == "" {
+		minHour, _ := strconv.ParseInt(minHoursString, 10, 32)
+
+		option["hours"] = map[string]int{"$gte": int(minHour)}
+	} else if minHoursString == "" && maxHoursString != "" {
+		maxHour, _ := strconv.ParseInt(maxHoursString, 10, 32)
+
+		option["hours"] = map[string]int{"$lte": int(maxHour)}
 	}
 }

@@ -2,9 +2,9 @@ package controllers
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
+	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 
 	"../models"
@@ -17,67 +17,83 @@ type Result struct {
 	Data    interface{} `json:"data"`
 }
 
+type ErrorResponse struct {
+	Code    int16  `json:"code"`
+	Message string `json:"message"`
+}
+
 // GetTask returns the task list
 func GetTask(c *gin.Context) {
 	id := c.Param("id")
+	var err error
+	collection := c.MustGet("DB").(*mgo.Database).C("task")
+
 	// find one
 	if id != "" {
-		models.GetOneTask(id, func(task []models.Task) {
-			if task != nil {
-				c.JSON(200, Result{
-					Success: true,
-					Code:    0,
-					Data:    task[0],
-				})
-			} else {
-				c.JSON(200, Result{
-					Success: true,
-					Code:    0,
-					Data:    nil,
-				})
-			}
-		})
+		var task models.Task
+		err = collection.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
+
+		if err == nil {
+			c.JSON(200, &Result{Success: true, Code: 0, Data: task})
+		}
 	} else {
+		var list []models.Task
 		option := make(map[string]interface{})
-		finishString := c.Query("finish")
-		typeString := c.Query("type")
-		difficultString := c.Query("difficult")
-		minHoursString := c.Query("minHours")
-		maxHoursString := c.Query("maxHours")
 
-		if finishString != "" {
-			option["finish"], _ = strconv.ParseBool(finishString)
+		// set options for find
+		models.GetOptionForRetrieveTask(c, option)
+
+		err = collection.Find(option).All(&list)
+
+		if err == nil {
+			c.JSON(200, &Result{Success: true, Code: 0, Data: list})
 		}
-		if typeString != "" {
-			option["type"], _ = strconv.ParseInt(typeString, 10, 8)
-		}
-		if difficultString != "" {
-			option["difficult"], _ = strconv.ParseInt(difficultString, 10, 8)
-		}
-
-		if minHoursString != "" && maxHoursString != "" {
-			minHour, _ := strconv.ParseInt(minHoursString, 10, 32)
-			maxHour, _ := strconv.ParseInt(maxHoursString, 10, 32)
-
-			option["hours"] = map[string]int{"$gte": int(minHour), "$lte": int(maxHour)}
-		} else if minHoursString != "" && maxHoursString == "" {
-			minHour, _ := strconv.ParseInt(minHoursString, 10, 32)
-
-			option["hours"] = map[string]int{"$gte": int(minHour)}
-		} else if minHoursString == "" && maxHoursString != "" {
-			maxHour, _ := strconv.ParseInt(maxHoursString, 10, 32)
-
-			option["hours"] = map[string]int{"$lte": int(maxHour)}
-		}
-
-		models.GetTask(option, func(task []models.Task) {
-			c.JSON(200, Result{
-				Success: true,
-				Code:    0,
-				Data:    task,
-			})
-		})
 	}
+
+	// Handling errors
+	if err != nil {
+		fmt.Println(err)
+		c.JSON(500, &ErrorResponse{Code: 301, Message: "database.connect.error"})
+		return
+	}
+}
+
+// CreateTask for create task
+func CreateTask(c *gin.Context) {
+	nowTime := time.Now().Unix() * 1000
+	id := bson.NewObjectId()
+
+	// 传入格式校验
+	item := &models.Task{
+		ID:         id,
+		Name:       "",
+		Type:       1,
+		Difficult:  2,
+		Deadline:   time.Now().Format("2006-01-02 15:04:05"),
+		Hours:      8,
+		Finish:     false,
+		Memo:       "",
+		CreateTime: nowTime,
+		UpdateTime: nowTime,
+	}
+	c.ShouldBindJSON(item)
+	// no name
+	if item.Name == "" {
+		c.JSON(400, &ErrorResponse{Code: 101, Message: "task.name.empty"})
+		return
+	}
+
+	models.CreateTask(item, func(success bool) {
+		if success {
+			c.JSON(200, map[string]string{"id": id.Hex()})
+		} else {
+			c.JSON(200, Result{
+				Success: false,
+				Code:    1,
+				Data:    nil,
+			})
+		}
+	})
 }
 
 // UpdateTask for update task
@@ -87,7 +103,21 @@ func UpdateTask(c *gin.Context) {
 	nowTime := time.Now().Unix() * 1000
 
 	c.ShouldBindJSON(&object)
+
+	// Determine the type of field to be modified
 	item := object.(map[string]interface{})
+	for k := range item {
+		switch k {
+		case "type", "difficult":
+			item[k] = int8(item[k].(float64))
+		case "name", "deadline", "memo":
+			item[k] = item[k].(string)
+		case "finish":
+			item[k] = item[k].(bool)
+		case "Hours":
+			item[k] = int(item[k].(float64))
+		}
+	}
 
 	if item["id"] == nil {
 		if idFromURL != "" {
@@ -124,51 +154,6 @@ func UpdateTask(c *gin.Context) {
 	})
 }
 
-// CreateTask for create task
-func CreateTask(c *gin.Context) {
-	nowTime := time.Now().Unix() * 1000
-	id := bson.NewObjectId()
-
-	task := models.Task{
-		ID:         id,
-		Name:       "",
-		Type:       1,
-		Difficult:  2,
-		Deadline:   time.Now().Format("2006-01-02 15:04:05"),
-		Hours:      8,
-		Finish:     false,
-		Memo:       "",
-		CreateTime: nowTime,
-		UpdateTime: nowTime,
-	}
-	c.ShouldBindJSON(&task)
-
-	if task.Name == "" {
-		c.JSON(200, Result{
-			Success: false,
-			Code:    1,
-			Data:    nil,
-		})
-		return
-	}
-
-	models.CreateTask(task, func(success bool) {
-		if success {
-			c.JSON(200, Result{
-				Success: true,
-				Code:    0,
-				Data:    id.Hex(),
-			})
-		} else {
-			c.JSON(200, Result{
-				Success: false,
-				Code:    1,
-				Data:    nil,
-			})
-		}
-	})
-}
-
 // DeleteTask for delete task
 func DeleteTask(c *gin.Context) {
 	var idList = make([]string, 1)
@@ -178,19 +163,18 @@ func DeleteTask(c *gin.Context) {
 	} else {
 		c.ShouldBindJSON(&idList)
 	}
-	models.DeleteTask(idList, func(success bool) {
-		if success {
-			c.JSON(200, Result{
-				Success: true,
-				Code:    0,
-				Data:    nil,
-			})
+	models.DeleteTask(idList, func(code int16) {
+		if code == 0 {
+			c.JSON(200, map[string]string{})
 		} else {
-			c.JSON(200, Result{
-				Success: false,
-				Code:    1,
-				Data:    nil,
-			})
+			httpCode := 200
+			message := ""
+			switch code {
+			case 301:
+				httpCode = 500
+				message = "database.connect.error"
+			}
+			c.JSON(httpCode, &ErrorResponse{Code: code, Message: message})
 		}
 	})
 }

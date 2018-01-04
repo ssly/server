@@ -2,11 +2,14 @@ package main
 
 import (
 	"./controllers"
+	"./middleware"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	route := gin.Default()
+
+	route.Use(middleware.ConnectDB)
 
 	route.GET("/", func(c *gin.Context) {
 		c.String(200, "Welcome golang")
