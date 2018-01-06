@@ -6,10 +6,7 @@
 ### 获取所有任务列表
 #### URL
 GET /task/manager
-#### 请求格式
-```
-/task/manager?finish=true&type=1&difficult=1&minHours=1&maxHours=8
-```
+> /task/manager?finish=true&type=1&difficult=1&minHours=1&maxHours=8
 #### 请求参数（URL param）
 | 参数 | 可选值 | 说明 |
 | :- | :- | :- |
@@ -20,47 +17,39 @@ GET /task/manager
 | maxHours | 0,1,... | 需要时间的最大值 |
 #### 返回格式
 ```json
-{
-    "success": true,
-    "code": 0,
-    "data": [
-        {
-            "id": "599af5182e02e989cfe19048",
-            "name": "测试信息1",
-            "type": 2,
-            "difficult": 1,
-            "deadline": "2017-09-10",
-            "hours": 4,
-            "finish": false,
-            "memo": "测试数据1"
-        },
-        {
-            "id": "5a37da1bf860a92924b3b3a9",
-            "name": "测试信息2",
-            "type": 1,
-            "difficult": 3,
-            "deadline": "2017-09-10",
-            "hours": 8,
-            "finish": true,
-            "memo": "测试数据2"
-        }
-    ]
-}
+[
+    {
+        "id": "599af5182e02e989cfe19048",
+        "name": "测试信息1",
+        "type": 2,
+        "difficult": 1,
+        "deadline": "2017-09-10",
+        "hours": 4,
+        "finish": false,
+        "memo": "测试数据1"
+    },
+    {
+        "id": "5a37da1bf860a92924b3b3a9",
+        "name": "测试信息2",
+        "type": 1,
+        "difficult": 3,
+        "deadline": "2017-09-10",
+        "hours": 8,
+        "finish": true,
+        "memo": "测试数据2"
+    }
+]
 ```
 
 ### 获取单个任务
 #### URL
 GET /task/manager/:id
-#### 请求格式
-```
-/task/manager/599af5182e02e989cfe19048
-```
+
+> /task/manager/599af5182e02e989cfe19048
 #### 返回格式
 ```json
-{
-    "success": true,
-    "code": 0,
-    "data": {
+[
+    {
         "id": "599af5182e02e989cfe19048",
         "name": "测试信息1",
         "type": 2,
@@ -70,7 +59,7 @@ GET /task/manager/:id
         "finish": false,
         "memo": "测试数据1"
     }
-}
+]
 ```
 
 ### 增加单个任务
@@ -136,7 +125,7 @@ PUT /task/manager
 }
 ```
 
-### 删除多个任务
+### 删除任务（多个）
 #### URL
 DELETE /task/manager
 #### 请求格式
@@ -145,26 +134,31 @@ DELETE /task/manager
 ```
 ### 返回格式
 ```json
+// success
+""
+
+// error
 {
-    "success": true,
-    "code": 0,
-    "data": null
+    "code": 201,
+    "message": "task.delete.some.error",
+    "data": ["599af5182e02e989cfe19048"]
 }
 ```
 
-### 删除单个任务
+### 删除任务（单个）
 #### URL
 DELETE /task/manager/:id
-#### 请求格式
-```
-/task/manager/599af5182e02e989cfe19048
-```
+> /task/manager/599af5182e02e989cfe19048
 #### 返回格式
 ```json
+// success
+""
+
+// faild
 {
-    "success": true,
-    "code": 0,
-    "data": null
+    "code": 202,
+    "message": "task.delete.all.error",
+    "data": ["599af5182e02e989cfe19048"]
 }
 ```
 

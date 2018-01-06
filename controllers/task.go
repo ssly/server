@@ -20,8 +20,9 @@ type Result struct {
 // ErrorResponse contain error message Code and Message
 // Code api in /api/code.md
 type ErrorResponse struct {
-	Code    int16  `json:"code"`
-	Message string `json:"message"`
+	Code    int16    `json:"code"`
+	Message string   `json:"message"`
+	Data    []string `json:"data"`
 }
 
 // GetTask returns the task list
@@ -164,18 +165,38 @@ func DeleteTask(c *gin.Context) {
 	} else {
 		c.ShouldBindJSON(&idList)
 	}
-	models.DeleteTask(idList, func(code int16) {
-		if code == 0 {
-			c.JSON(200, map[string]string{})
-		} else {
-			httpCode := 200
-			message := ""
-			switch code {
-			case 301:
-				httpCode = 500
-				message = "database.connect.error"
-			}
-			c.JSON(httpCode, &ErrorResponse{Code: code, Message: message})
+
+	collection := c.MustGet("DB").(*mgo.Database).C("task")
+
+	idListLen := len(idList)
+	channel := make(chan string, idListLen)
+
+	go models.DeleteTaskMany(channel, collection, idList)
+
+	errIDList := make([]string, 0, idListLen)
+	for i := 0; i < idListLen; i++ {
+		// If someone false, response error
+		errID := <-channel
+		if errID != "" {
+			errIDList = append(errIDList, errID)
 		}
-	})
+	}
+
+	errIDListLen := len(errIDList)
+	if errIDListLen != 0 {
+		if errIDListLen == idListLen {
+			// delete all error
+			c.JSON(400, &ErrorResponse{Code: 202, Message: "task.delete.all.error"})
+		} else {
+			c.JSON(400, &ErrorResponse{
+				Code:    201,
+				Message: "task.delete.some.error",
+				Data:    errIDList,
+			})
+		}
+
+		return
+	}
+
+	c.String(200, "")
 }
