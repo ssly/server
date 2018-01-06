@@ -13,6 +13,7 @@ import (
 
 const MongoURL = config.MongoURL
 
+// Task is the response data for task.
 type Task struct {
 	ID         bson.ObjectId `json:"id" bson:"_id"`
 	Name       string        `json:"name"`
@@ -128,9 +129,9 @@ func DeleteTask(idList []string, callback func(code int16)) {
 	callback(code)
 }
 
-// GetOptionForRetrieveTask for get options for retrieve task
+// GetOptionForGetTask for get options for retrieve task
 // contain finish / type / difficult / minHours / maxHours
-func GetOptionForRetrieveTask(c *gin.Context, option map[string]interface{}) {
+func GetOptionForGetTask(c *gin.Context, option map[string]interface{}) {
 	finishString := c.Query("finish")
 	typeString := c.Query("type")
 	difficultString := c.Query("difficult")

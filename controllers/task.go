@@ -17,6 +17,8 @@ type Result struct {
 	Data    interface{} `json:"data"`
 }
 
+// ErrorResponse contain error message Code and Message
+// Code api in /api/code.md
 type ErrorResponse struct {
 	Code    int16  `json:"code"`
 	Message string `json:"message"`
@@ -25,37 +27,36 @@ type ErrorResponse struct {
 // GetTask returns the task list
 func GetTask(c *gin.Context) {
 	id := c.Param("id")
+	list := make([]models.Task, 1)
+
 	var err error
 	collection := c.MustGet("DB").(*mgo.Database).C("task")
 
 	// find one
 	if id != "" {
-		var task models.Task
-		err = collection.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&task)
-
-		if err == nil {
-			c.JSON(200, &Result{Success: true, Code: 0, Data: task})
-		}
+		defer func() {
+			// ObjectIdHex error
+			if err := recover(); err != nil {
+				c.JSON(200, []interface{}{})
+			}
+		}()
+		err = collection.Find(bson.M{"_id": bson.ObjectIdHex(id)}).One(&list[0])
 	} else {
-		var list []models.Task
 		option := make(map[string]interface{})
 
 		// set options for find
-		models.GetOptionForRetrieveTask(c, option)
+		models.GetOptionForGetTask(c, option)
 
 		err = collection.Find(option).All(&list)
-
-		if err == nil {
-			c.JSON(200, &Result{Success: true, Code: 0, Data: list})
-		}
 	}
 
-	// Handling errors
 	if err != nil {
 		fmt.Println(err)
 		c.JSON(500, &ErrorResponse{Code: 301, Message: "database.connect.error"})
 		return
 	}
+
+	c.JSON(200, list)
 }
 
 // CreateTask for create task
